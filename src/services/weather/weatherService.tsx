@@ -1,54 +1,57 @@
-// weatherService.ts
-import config from "../../../config";
+import config from "../../../config"; // Adjust the path according to your project structure
 import { WeatherConditions } from "./model";
 
-// This is a base URL for the National Weather Service API.
-const BASE_URL = config.apiBaseUrl;
-
-// TypeScript interfaces to describe the data shapes
 interface Coordinates {
   latitude: number;
   longitude: number;
 }
 
-// Function to get weather conditions by coordinates
 export async function getWeatherByCoordinates(
   coordinates: Coordinates
 ): Promise<WeatherConditions | null> {
   try {
-    // Construct the URL for the weather endpoint
-    const endpoint = `/points/${coordinates.latitude},${coordinates.longitude}`;
-    const originalForeCastUrl = `${BASE_URL}${endpoint}`;
-    console.log("originalForeCastUrl is: ", originalForeCastUrl);
-    const response = await fetch(originalForeCastUrl);
+    const endpoint = `${config.apiBaseUrl}${config.weatherApi.endpoint}/${coordinates.latitude},${coordinates.longitude}`;
+    const response = await fetch(endpoint);
 
     if (!response.ok) {
-      throw new Error(`Error fetching weather data: ${response.statusText}`);
+      throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    // Parse the JSON response
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (e) {
+      throw new Error("Failed to parse response as JSON.");
+    }
 
-    // You might need to navigate the JSON structure based on the API response
-    // For example, let's say the forecast URL is in data.properties.forecast
-    const forecastUrl = data.properties.forecast;
-    console.log("forecastUrl is: ", forecastUrl);
-    const forecastResponse = await fetch(forecastUrl);
-    console.log("forecastResponse is: ", forecastResponse);
+    if (!data.properties || !data.properties.forecast) {
+      throw new Error("Invalid data structure: missing forecast information.");
+    }
+
+    const forecastResponse = await fetch(data.properties.forecast);
 
     if (!forecastResponse.ok) {
-      throw new Error(
-        `Error fetching forecast data: ${forecastResponse.statusText}`
-      );
+      throw new Error(`HTTP error! Status: ${forecastResponse.status}`);
     }
 
-    const forecastData = await forecastResponse.json();
+    let forecastData;
+    try {
+      forecastData = await forecastResponse.json();
+    } catch (e) {
+      throw new Error("Failed to parse forecast response as JSON.");
+    }
 
-    // Again, this structure depends on the actual API response
-    // This is an example of how you might access the current conditions
+    if (
+      !forecastData ||
+      !forecastData.properties ||
+      !forecastData.properties.periods ||
+      !forecastData.properties.periods[0]
+    ) {
+      throw new Error("Invalid forecast data structure.");
+    }
+
     const currentConditions = forecastData.properties.periods[0];
 
-    // Return the weather conditions in a structured format
     return {
       temperature: currentConditions.temperature,
       windSpeed: currentConditions.windSpeed,
